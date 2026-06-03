@@ -291,3 +291,14 @@ The goal is informed trust.
 ## Long-Term Vision
 
 Transform AI from a system users either blindly trust or constantly verify into one they can confidently evaluate.
+
+
+
+https://github.com/user-attachments/assets/1be4346c-89e6-4bae-8e7a-c057b1b52a01
+
+
+
+
+
+
+
