@@ -8,6 +8,8 @@ As AI becomes increasingly capable, users are relying on it for research, analys
 
 ReviewMode aims to make these risks visible so users can make more informed decisions about when to trust, verify, or challenge AI outputs.
 
+Vercel live prototype link - https://chat-gpt-review-mode-solution.vercel.app/ 
+
 ---
 
 ## Problem
