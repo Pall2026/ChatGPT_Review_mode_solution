@@ -1401,42 +1401,75 @@ function openReasoningGraph(reasoningId) {
   
   DOM.reasoningBackdrop.classList.remove("hidden");
 
-  // Center coordinates (relative to the container)
   const containerW = DOM.reasoningCanvas.clientWidth || 800;
   const containerH = DOM.reasoningCanvas.clientHeight || 600;
   
   const centerX = containerW / 2;
-  const centerY = (containerH / 2) + 80; // shifted down further to avoid header and accommodate larger radius
 
-  // 1. Create Central Node
+  // 1. Calculate Depths (0 = inference, 1 = direct sources, 2 = sources of sources)
+  const depths = { "inference": 0 };
+  let changed = true;
+  while(changed) {
+    changed = false;
+    graphData.edges.forEach(edge => {
+      if (depths[edge.to] !== undefined && depths[edge.from] === undefined) {
+        depths[edge.from] = depths[edge.to] + 1;
+        changed = true;
+      }
+    });
+  }
+
+  // Any orphaned nodes get depth 1
+  graphData.sources.forEach(src => {
+    if (depths[src.id] === undefined) depths[src.id] = 1;
+  });
+
+  // 2. Group nodes by depth
+  const levelNodes = {};
+  const allNodes = ["inference", ...graphData.sources.map(s => s.id)];
+  allNodes.forEach(id => {
+    const d = depths[id];
+    if (!levelNodes[d]) levelNodes[d] = [];
+    levelNodes[d].push(id);
+  });
+
+  // 3. Calculate Positions
+  const nodePositions = {};
+  const levelHeight = 180; // Vertical spacing between levels (reduced to prevent cutoff)
+  
+  // Center of inference is near the bottom
+  const bottomY = containerH - 100;
+
+  Object.keys(levelNodes).forEach(d => {
+    const depth = parseInt(d);
+    const nodes = levelNodes[depth];
+    const widthPerNode = 340; // Horizontal spacing
+    const totalWidth = nodes.length * widthPerNode;
+    const startX = centerX - totalWidth / 2 + widthPerNode / 2;
+    
+    nodes.forEach((id, idx) => {
+      const x = startX + idx * widthPerNode;
+      const y = bottomY - (depth * levelHeight);
+      nodePositions[id] = { x, y };
+    });
+  });
+
+  // 4. Render Nodes
+  // Inference Node
   const centralNode = document.createElement("div");
   centralNode.className = "reasoning-node node-central";
-  centralNode.style.left = `${centerX}px`;
-  centralNode.style.top = `${centerY}px`;
+  centralNode.style.left = `${nodePositions["inference"].x}px`;
+  centralNode.style.top = `${nodePositions["inference"].y}px`;
   centralNode.innerHTML = `<div class="node-header">${graphData.inference}</div>`;
   DOM.reasoningNodes.appendChild(centralNode);
 
-  // 2. Position Source Nodes in a circle/arc around the center
-  const radius = 300; // Increased radius to prevent node overlapping, but keeping it within view
-  const totalSources = graphData.sources.length;
-  // Arc from roughly 160 degrees to 20 degrees for better horizontal spread
-  const startAngle = Math.PI * 0.90; 
-  const endAngle = Math.PI * 0.10;
-  const angleStep = totalSources > 1 ? (endAngle - startAngle) / (totalSources - 1) : 0;
-
-  const nodePositions = { "inference": { x: centerX, y: centerY } };
-
-  graphData.sources.forEach((src, i) => {
-    const angle = totalSources > 1 ? startAngle + (i * angleStep) : Math.PI / 2;
-    const nx = centerX + radius * Math.cos(angle);
-    const ny = centerY - radius * Math.sin(angle); // negative because y goes down
-
-    nodePositions[src.id] = { x: nx, y: ny };
-
+  // Source Nodes
+  graphData.sources.forEach(src => {
+    const pos = nodePositions[src.id];
     const snode = document.createElement("div");
     snode.className = `reasoning-node node-source ${src.type}`;
-    snode.style.left = `${nx}px`;
-    snode.style.top = `${ny}px`;
+    snode.style.left = `${pos.x}px`;
+    snode.style.top = `${pos.y}px`;
 
     const icon = src.type === "green" ? '<polyline points="20 6 9 17 4 12"/>' :
                  src.type === "yellow" ? '<line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>' :
@@ -1456,26 +1489,29 @@ function openReasoningGraph(reasoningId) {
     DOM.reasoningNodes.appendChild(snode);
   });
 
-  // 3. Draw Edges and Labels
+  // 5. Draw Edges and Labels cleanly
   let svgPaths = "";
   graphData.edges.forEach(edge => {
-    const p1 = nodePositions[edge.from];
-    const p2 = nodePositions[edge.to];
-    if (!p1 || !p2) return;
+    const fromPos = nodePositions[edge.from];
+    const toPos = nodePositions[edge.to];
+    if (!fromPos || !toPos) return;
 
-    // Draw bezier curve for organic feel
-    const dx = Math.abs(p2.x - p1.x);
-    // Control points to create a gentle curve
-    const cp1x = p1.x + (dx * 0.3) * (p1.x < p2.x ? 1 : -1);
-    const cp1y = p1.y + 40;
-    const cp2x = p2.x - (dx * 0.3) * (p1.x < p2.x ? 1 : -1);
-    const cp2y = p2.y - 40;
-    svgPaths += `<path d="M ${p1.x} ${p1.y} C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${p2.x} ${p2.y}" />`;
+    // Offset the line start/end so they touch the EDGES of the boxes, not the center
+    // Approximate box height is 120px. So offset Y by 60px.
+    const startY = fromPos.y + 60; // Bottom of parent
+    const endY = toPos.y - 60;   // Top of child
+    
+    // Smooth vertical S-curve
+    const cp1x = fromPos.x;
+    const cp1y = startY + (endY - startY) * 0.4;
+    const cp2x = toPos.x;
+    const cp2y = endY - (endY - startY) * 0.4;
 
-    // Add Edge Label in the middle
-    // Approximate midpoint
-    const midX = (p1.x + p2.x) / 2;
-    const midY = (p1.y + p2.y) / 2;
+    svgPaths += `<path d="M ${fromPos.x} ${startY} C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${toPos.x} ${endY}" stroke-dasharray="6,6" />`;
+
+    // Edge Label perfectly centered on the curve
+    const midX = (fromPos.x + toPos.x) / 2;
+    const midY = (startY + endY) / 2;
 
     const label = document.createElement("div");
     label.className = "edge-label";
