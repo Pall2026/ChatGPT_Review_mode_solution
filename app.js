@@ -368,7 +368,7 @@ function renderWelcomeScreen() {
     <div class="welcome-screen">
       <div class="welcome-orb">AI</div>
       <h1>What can I help with?</h1>
-      <p>Choose an example below to see how the AI analyzes data and explains its reasoning.</p>
+      <p>Choose an example below to see how the Context check and Review layer works.</p>
       <div class="suggestion-chips" style="flex-direction:column; align-items:center;">
         <button class="suggestion-chip topic-btn" data-topic="ev-market">
           <span class="chip-icon">🚗</span>India EV Market Analysis 2026
