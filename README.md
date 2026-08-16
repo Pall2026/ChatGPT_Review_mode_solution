@@ -296,7 +296,13 @@ Transform AI from a system users either blindly trust or constantly verify into 
 
 
 
-https://github.com/user-attachments/assets/1be4346c-89e6-4bae-8e7a-c057b1b52a01
+
+
+https://github.com/user-attachments/assets/ff17fb1e-97f3-4c99-9e11-f148a164b956
+
+
+
+
 
 
 
